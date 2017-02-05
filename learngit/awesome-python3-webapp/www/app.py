@@ -15,6 +15,8 @@ from datetime import datetime
 from aiohttp import web
 from jinja2 import Environment, FileSystemLoader
 
+from config import configs
+
 import orm
 from coroweb import add_routes, add_static
 
@@ -39,14 +41,18 @@ def init_jinja2(app, **kw):
             env.filters[name] = f
     app['__templating__'] = env
 
+@asyncio.coroutine
 async def logger_factory(app, handler):
+    @asyncio.coroutine
     async def logger(request):
         logging.info('Request: %s %s' % (request.method, request.path))
-        # await asyncio.sleep(0.3)
+        # yield from asyncio.sleep(0.3)
         return (await handler(request))
     return logger
 
+@asyncio.coroutine
 async def data_factory(app, handler):
+    @asyncio.coroutine
     async def parse_data(request):
         if request.method == 'POST':
             if request.content_type.startswith('application/json'):
@@ -58,7 +64,9 @@ async def data_factory(app, handler):
         return (await handler(request))
     return parse_data
 
+@asyncio.coroutine
 async def response_factory(app, handler):
+    @asyncio.coroutine
     async def response(request):
         logging.info('Response handler...')
         r = await handler(request)
@@ -84,8 +92,8 @@ async def response_factory(app, handler):
                 resp = web.Response(body=app['__templating__'].get_template(template).render(**r).encode('utf-8'))
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
-        if isinstance(r, int) and r >= 100 and r < 600:
-            return web.Response(r)
+        if isinstance(r, int) and t >= 100 and t < 600:
+            return web.Response(t)
         if isinstance(r, tuple) and len(r) == 2:
             t, m = r
             if isinstance(t, int) and t >= 100 and t < 600:
@@ -109,8 +117,9 @@ def datetime_filter(t):
     dt = datetime.fromtimestamp(t)
     return u'%s年%s月%s日' % (dt.year, dt.month, dt.day)
 
+@asyncio.coroutine
 async def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www', password='www', db='awesome')
+    await orm.create_pool(loop=loop, **configs.db)
     app = web.Application(loop=loop, middlewares=[
         logger_factory, response_factory
     ])
